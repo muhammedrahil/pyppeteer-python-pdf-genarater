@@ -131,3 +131,62 @@ def download_proforma_to_customer(request, proforma_id):
 ```
 
 
+## How to Download using Js
+
+```javascript
+
+
+    async function Download() {
+        event.preventDefault();
+        const spinner = document.getElementById('po-spinner');
+        spinner.removeAttribute('style');
+        const url = ''
+        try {
+            const res = await axios.get(url);
+            if (res.status === 200) {
+                if (res.data.file_url){
+                    await downloadFile(res.data.file_url, res.data.filename);
+                }
+                spinner.style.display= 'none';    
+            } else {
+                toastr.error(res.data.msg);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000); 
+            }
+        } catch (error) {
+            if (error.response){
+                toastr.error(error.response.data.msg);
+            }
+            setTimeout(() => {
+                    window.location.reload();
+            }, 2000); 
+        }
+      }
+
+
+function downloadFile(url, filename) {
+    axios({
+        url: url,
+        method: 'GET',
+        responseType: 'blob', // Important
+    })
+        .then(response => {
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename; // Set desired file name here
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            toastr.success(`Successfully Downloaded ${filename}`);
+        })
+        .catch(error => {
+            console.error('Error downloading file:', error);
+            toastr.success(error);
+        });
+}
+
+
+
+```
