@@ -51,3 +51,47 @@ async def generate_pdf(html_content : str, pdf_name : str) -> Tuple[str,int]:
         raise
 ```
 
+## Async Call
+```python
+
+from asgiref.sync import sync_to_async
+
+async def async_download_proforma_to_customer(request, proforma_id):
+    is_authenticated = await sync_to_async(lambda: request.user.is_authenticated)()
+    if not is_authenticated:
+        return JsonResponse({"error": "User not authenticated"}, status=400)
+
+    try:
+        proforma_header = await ProformaHeader.objects.aget(id=proforma_id)
+    except ProformaHeader.DoesNotExist:
+        return JsonResponse({"error": "Proforma not found"}, status=400)
+
+    @sync_to_async
+    def get_proforma_details() -> QuerySet[ProformaDetail]:
+        return ProformaDetail.objects.filter(proformaheader=proforma_header,status=ACTIVE).order_by('lineno')
+    @sync_to_async
+    def filter_details_count(queryset:QuerySet[ProformaDetail]):
+        return queryset.count()
+    proforma_details = await get_proforma_details()
+    if await filter_details_count(proforma_details) == 0:
+        return JsonResponse({'msg': "Please add Items to proforma"}, status=400)
+    
+    if not proforma_header.confirmed_this_order:
+        if not proforma_header.print_order_confirmed:
+            proforma_header.print_order_confirmed = True
+            proforma_header.sentdate = timezone.now()
+            proforma_header.proforma_status = SEND
+            proforma_header.asave()
+
+    context = await sync_to_async(proforma_pdf_content)(proforma_header, proforma_details)
+    html_content = await sync_to_async(render_to_string)('pshome/proforma/more-option/download.html', context)
+    pdf_filename = 'proforma-confirmation'
+    pdf_file_url_or_error, gen_status = await generate_pdf(html_content,pdf_filename)
+    if gen_status == 400:
+        return JsonResponse({'msg':pdf_file_url_or_error}, status=400)
+    await sync_to_async(user_log_create)(request, request.user, action="Created", action_message="Proforma Printed confirmed Pdf", module_name='Proforma', module_instance_id=proforma_header.id)   
+    return JsonResponse({'file_url':pdf_file_url_or_error,"filename":pdf_filename}, status=200)
+
+```
+
+
