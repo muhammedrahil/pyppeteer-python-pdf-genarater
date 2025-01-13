@@ -95,3 +95,39 @@ async def async_download_proforma_to_customer(request, proforma_id):
 ```
 
 
+
+## Sync Call
+
+```python
+from asgiref.sync import async_to_sync
+
+
+@login_required(login_url='patriot_app:user_login')
+def download_proforma_to_customer(request, proforma_id):
+    proforma_header = ProformaHeader.objects.filter(id= proforma_id).first()
+    proforma_details = ProformaDetail.objects.filter(proformaheader=proforma_header,status=ACTIVE).order_by('lineno')
+    
+    if not proforma_details:
+        return JsonResponse({'msg': "Please add Items to proforma"}, status=400)
+
+    context = proforma_pdf_content(proforma_header, proforma_details)
+    template = 'pshome/proforma/more-option/download.html'
+    if not proforma_header.confirmed_this_order:
+        if not proforma_header.print_order_confirmed:
+            proforma_header.print_order_confirmed = True
+            proforma_header.sentdate = timezone.now()
+            proforma_header.proforma_status = SEND
+            proforma_header.save()
+
+    pdf_filename = 'proforma-confirmation.pdf'
+    html_content = render_to_string(template, context)
+    pdf_file_url_or_error, gen_status = async_to_sync(generate_pdf)(html_content,pdf_filename)
+    if gen_status == 400:
+        return JsonResponse({'msg':pdf_file_url_or_error}, status=400)
+    user_log_create(request, request.user, action="Created", action_message="Proforma Printed confirmed Pdf", module_name='Proforma', module_instance_id=proforma_header.id)   
+    return JsonResponse({'file_url':pdf_file_url_or_error,"filename":pdf_filename}, status=200)
+
+
+```
+
+
