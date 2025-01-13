@@ -1,4 +1,4 @@
-# pyppeteer-python-pdf-genarater
+# pyppeteer-python-pdf-generator
 
 ```python
 
